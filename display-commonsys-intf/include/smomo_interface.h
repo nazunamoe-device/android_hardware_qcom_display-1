@@ -24,7 +24,6 @@
 
 /*! @file smomo.h
   @brief Interface file for SmoMo which defines the public interface exposed to SmoMo clients.
-
   @details SmoMo clients use these interfaces to feed SmoMo required info like frame rate, refresh
   rate, these info are used to update SmoMo internal state.
 */
@@ -39,31 +38,38 @@
 
 namespace smomo {
 
+#define SMOMO_LIBRARY_NAME "libsmomo.qti.so"
+#define CREATE_SMOMO_INTERFACE_NAME "CreateSmomoInterface"
+#define DESTROY_SMOMO_INTERFACE_NAME "DestroySmomoInterface"
+
+#define SMOMO_REVISION_MAJOR (1)
+#define SMOMO_REVISION_MINOR (0)
+#define SMOMO_VERSION_TAG ((uint16_t) ((SMOMO_REVISION_MAJOR << 8) \
+                                          | SMOMO_REVISION_MINOR))
+
 typedef int64_t nsecs_t;
 
 /*! @brief This structure defines the layer stats required by SmoMo.
-
   @sa SmomoIntf::updateSmomoState
 */
 struct SmomoLayerStats {
   std::string name;  // layer full name
-  int32_t id;    // layer ID
+  int32_t id;  // layer ID
 };
 
 /*! @brief This structure defines the buffer stats required by SmoMo.
-
   @sa SmomoIntf::CollectLayerStats
   @sa SmomoIntf::ShouldPresentNow
 */
 struct SmomoBufferStats {
-  int32_t id;    // layer ID
+  int32_t id;  // layer ID
   int32_t queued_frames;  // queued frame count of this layer
   bool auto_timestamp;  // whether timestamp was generated automatically
   nsecs_t timestamp;  // layer buffer's timestamp
+  nsecs_t dequeue_latency;  // last dequeue duration
 };
 
 /*! @brief SmoMo interface implemented by SmoMo library.
-
   @details This class declares prototype for SmoMo public interfaces which must be
   implemented by SmoMo library. SmoMo clients will use these methods to feed required
   info to SmoMo implementation.
@@ -73,37 +79,28 @@ class SmomoIntf {
   virtual ~SmomoIntf() = default;
 
   /*! @brief Update SmoMo internal state.
-
     @details This function is called once per each composition so that required layer info are feed
     to SmoMo, the SmoMo uses these info to update its internal state.
-
     @param[in] layers \link SmomoLayerStats \endlink
     @param[in] refresh_rate current display refresh rate
-
     @return \link void \endlink
   */
   virtual void UpdateSmomoState(const std::vector<SmomoLayerStats> &layers,
       float refresh_rate) = 0;
 
   /*! @brief Collect layer buffer stats.
-
     @details This function is called once new buffer is ready for this layer. It's used to collect
     layer's buffer stats for SmoMo.
-
     @param[in] \link SmomoBufferStats \endlink
-
     @return \link void \endlink
   */
   virtual void CollectLayerStats(const SmomoBufferStats &buffer_stats) = 0;
 
   /*! @brief Is this layer buffer ready to present.
-
     @details This function is called by SmoMo clients used to check whether this layer buffer is
     due to present.
-
     @param[in] \link SmomoBufferStats \endlink
     @param[in] next_vsync_time When next VSYNC arrives
-
     @return \link bool \endlink
   */
   virtual bool ShouldPresentNow(const SmomoBufferStats &buffer_stats,
@@ -114,26 +111,23 @@ class SmomoIntf {
   using ChangeRefreshRateCallback = std::function<void(int32_t)>;
 
   /*! @brief Set the callback used by SmoMo to change display refresh rate.
-
     @details This function is called by SmoMo clients used to set the refresh rate callback.
-
     @param[in] callback \link ChangeRefreshRateCallback \endlink
-
     @return \link void \endlink
   */
   virtual void SetChangeRefreshRateCallback(
       const ChangeRefreshRateCallback& callback) = 0;
 
   /*! @brief Set the refersh rates supported by display.
-
     @details This function is called to tell SmoMo what refresh rates this display can suport.
-
-    @param[in] refresh_rates The refresh rates list supported by the display
-
+    @param[in] refresh_rates The refresh rates supported by the display
     @return \link void \endlink
   */
   virtual void SetDisplayRefreshRates(const std::vector<float> &refresh_rates) = 0;
 };
+
+typedef bool (*CreateSmomoInterface)(uint16_t version, SmomoIntf **interface);
+typedef void (*DestroySmomoInterface)(SmomoIntf *interface);
 
 }  // namespace smomo
 
